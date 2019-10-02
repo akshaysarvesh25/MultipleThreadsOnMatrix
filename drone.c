@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_REALTIME, &start); 	// Do not remove
 //start = clock();
 
-
+  std::cout<<"num_cells : "<<num_cells<<" num_threads : "<<num_threads<<std::endl;
 
     if(num_cells<=num_threads)
     {
@@ -101,10 +101,13 @@ int main(int argc, char *argv[]) {
       }
 
       // Join threads
+      /*
       for (int i = 0; i < num_threads; i++)
       {
         pthread_join(p_threads[i], NULL);
+
       }
+      std::cout<<"Done joining"<<std::endl;*/
     }
 
     /* If number of cells is greater than the number of threads */
@@ -163,6 +166,13 @@ int main(int argc, char *argv[]) {
 void *get_grid_pos(void *s)
 {
     int index = *((int *)s);
-    unsigned int row=(int)(index/(num_threads-1));
+    unsigned int row=(int)(index/(get_gridsize()-1));
+    unsigned int column = index%(get_gridsize()-1);
+    //std::cout<<"Grid position = "<<row<<" "<<column<<std::endl;
+    if(check_grid(row,column) == 0)
+    {
+      std::cout<<"Success in Grid position = "<<row<<" "<<column<<"; thread id = "<<index<<std::endl;
+    }
+    pthread_detach(pthread_self());
 
 }
