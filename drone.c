@@ -94,13 +94,13 @@ int main(int argc, char *argv[]) {
 
     if(num_cells<=num_threads)
     {
-      for (int i = 0; i < num_threads; i++)
+      for (int i = 0; i < num_cells; i++)
       {
         thread_id[i] = i;
         pthread_create(&p_threads[i], &attr, get_grid_pos, (void *) &thread_id[i]);
       }
 
-      // Join threads
+      // Join threads removed as pthread_detach routine used
       /*
       for (int i = 0; i < num_threads; i++)
       {
@@ -118,7 +118,15 @@ int main(int argc, char *argv[]) {
 
       for(int j = 0;j<count_for_threads;j++)
       {
+        for(int i = 0;i<num_threads;i++)
+        {
+          if(i==0)
+          {
+            thread_id[i] = i;
+            pthread_create(&p_threads[i], &attr, get_grid_pos, (void *) &thread_id[i]);
 
+          }
+        }
       }
 
     }
