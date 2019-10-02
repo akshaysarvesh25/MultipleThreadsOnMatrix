@@ -29,7 +29,7 @@
 #include<iostream>
 
 #include "drone.h"		// Do not remove
-struct timespec start, stop; 	// Do not remove
+struct timespec start, stop, stop1; 	// Do not remove
 //clock_t start, stop;
 
 double total_time;		// Do not remove
@@ -46,8 +46,11 @@ pthread_attr_t attr;		// Thread attributes
 pthread_mutex_t lock_barrier;	// Protects count
 pthread_cond_t cond_barrier;	// Monitors count
 
-void *get_grid_pos(void *s);
+unsigned int num_threads = MAX_THREADS -100;
+unsigned int num_cells = get_gridsize()*get_gridsize();
 
+void *get_grid_pos(void *s);
+void *get_grid_pos_(void *s);
 // -------------------------------------------------------------------------
 // Data structures and multithreaded code to find drone in the grid
 // ...
@@ -115,7 +118,7 @@ int main(int argc, char *argv[]) {
     {
       unsigned int diff_bw_cells_threads = num_cells-num_threads;
       unsigned int count_for_threads = num_cells/num_threads;
-
+      /*
       for(int j = 0;j<count_for_threads;j++)
       {
         for(int i = 0;i<num_threads;i++)
@@ -123,14 +126,21 @@ int main(int argc, char *argv[]) {
           if(i==0)
           {
             thread_id[i] = i;
-            pthread_create(&p_threads[i], &attr, get_grid_pos, (void *) &thread_id[i]);
-
+            pthread_create(&p_threads[i], &attr, get_grid_pos_, (void *) &thread_id[i]);
           }
         }
+      }*/
+
+      for (int i = 0; i < num_threads; i++)
+      {
+        thread_id[i] = i;
+        pthread_create(&p_threads[i], &attr, get_grid_pos_, (void *) &thread_id[i]);
       }
 
     }
-
+    clock_gettime(CLOCK_REALTIME, &stop1);
+    total_time = (stop1.tv_sec-start.tv_sec)	+0.000000001*(stop1.tv_nsec-start.tv_nsec);
+    printf("Total time taken for the thread part to execute : time (sec) = %8.4f\n ", total_time);
 
     // Multithreaded code to find drone in the grid
     // ...
@@ -182,5 +192,28 @@ void *get_grid_pos(void *s)
       std::cout<<"Success in Grid position = "<<row<<" "<<column<<"; thread id = "<<index<<std::endl;
     }
     pthread_detach(pthread_self());
+
+}
+
+void *get_grid_pos_(void *s)
+{
+  int index = *((int *)s);
+  unsigned int row = (int)(index/(get_gridsize()-1));
+  unsigned int column = index%(get_gridsize()-1);
+
+  while(check_grid(row,column) != 0)
+  {
+    index += num_threads;
+    if(index>num_cells)
+    {
+      pthread_detach(pthread_self());
+      return 0;
+    }
+    row = (int)(index/(get_gridsize()-1));
+    column = index%(get_gridsize()-1);
+  }
+
+  std::cout<<"Success in Grid position when the number of cells > maximum allowable threads = "<<row<<" "<<column<<"; thread id = "<<index<<std::endl;
+  pthread_detach(pthread_self());
 
 }
