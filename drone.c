@@ -47,6 +47,7 @@ pthread_mutex_t lock_barrier;	// Protects count
 pthread_cond_t cond_barrier;	// Monitors count
 
 unsigned int num_threads = MAX_THREADS -100;
+
 unsigned int num_cells_ ;
 
 void *get_grid_pos(void *s);
