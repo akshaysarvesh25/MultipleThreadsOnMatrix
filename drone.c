@@ -37,16 +37,13 @@ int gridsize;			// Do not remove
 
 unsigned int drone_x, drone_y; 	//Coordinates of drone (to be found)
 
-#define MAX_THREADS     32745
+#define MAX_THREADS    4800
 
 int thread_id[MAX_THREADS];	// User defined id for thread
 pthread_t p_threads[MAX_THREADS];// Threads
 pthread_attr_t attr;		// Thread attributes
 
-pthread_mutex_t lock_barrier;	// Protects count
-pthread_cond_t cond_barrier;	// Monitors count
-
-unsigned int num_threads = MAX_THREADS -100;
+unsigned int num_threads = MAX_THREADS;
 
 unsigned int num_cells_ ;
 
@@ -64,6 +61,30 @@ void *get_grid_pos_(void *s);
 
 // -------------------------------------------------------------------------
 // Main program to find drone in a grid
+//
+
+/*Algorithm for Multi-threaded execution :
+ * The algorithm creates an optimal number of threads and uses the threads in 
+ * the following manner:
+ * 1. When the number of grids are lesser than or equal to the  optimal number of threads :
+ *    In this case, a total number of threads equal to the number of cells are
+ *    created. Individual threads are assigned to a indivdual grid to check if
+ *    the drone is present in that grid. After confirming the presence of the drone,
+ *    the program prints the grid name, output of check_drone_location and the 
+ *    total execution time.
+ *  2. When the number of grids are greater than the optimal number of threads :
+ *     In this case, a total number of threads equal to the maximum number of available
+ *     threads are created. Individual threads are assigned to grid locations 
+ *     corresponding to their id's. If the drone exists in that location, the grid location
+ *     is captured and the program is ended. If the drone does not exist in that specific 
+ *     grid location, it moves on to the grid location which is equal to the sum of the 
+ *     optimal number of threads and its id and repeats the above until a threead runs out
+ *     of grid spaces.
+ *The optimal number of threads to run on a machine at any given time depends on the machine
+ *specifically and the best way to find out the optimal number of threads is to run the 
+ *with a varied number of threads and find out the number of threads which gives the best 
+ *performance.
+ * */
 int main(int argc, char *argv[]) {
 
     if (argc != 5) {
@@ -81,12 +102,10 @@ int main(int argc, char *argv[]) {
 
 
     // Initialize mutex, condition variable, and attribute structures
-    pthread_mutex_init(&lock_barrier, NULL);
-    pthread_cond_init(&cond_barrier, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-    unsigned int num_threads = MAX_THREADS -100;
+    unsigned int num_threads = MAX_THREADS;
     num_cells_ = gridsize*gridsize;
 
 //    print_drone_path();
@@ -94,8 +113,7 @@ int main(int argc, char *argv[]) {
     clock_gettime(CLOCK_REALTIME, &start); 	// Do not remove
 //start = clock();
 
-  //std::cout<<"num_cells_ : "<<num_cells_<<" num_threads : "<<num_threads<<std::endl;
-
+   /* If number of cells is lesser than or equal to the number of threads */
     if(num_cells_<=num_threads)
     {
       for (int i = 0; i < num_cells_; i++)
@@ -103,15 +121,6 @@ int main(int argc, char *argv[]) {
         thread_id[i] = i;
         pthread_create(&p_threads[i], &attr, get_grid_pos, (void *) &thread_id[i]);
       }
-
-      // Join threads removed as pthread_detach routine used
-      /*
-      for (int i = 0; i < num_threads; i++)
-      {
-        pthread_join(p_threads[i], NULL);
-
-      }
-      std::cout<<"Done joining"<<std::endl;*/
     }
 
     /* If number of cells is greater than the number of threads */
@@ -119,29 +128,14 @@ int main(int argc, char *argv[]) {
     {
       unsigned int diff_bw_cells_threads = num_cells_-num_threads;
       unsigned int count_for_threads = num_cells_/num_threads;
-      /*
-      for(int j = 0;j<count_for_threads;j++)
-      {
-        for(int i = 0;i<num_threads;i++)
-        {
-          if(i==0)
-          {
-            thread_id[i] = i;
-            pthread_create(&p_threads[i], &attr, get_grid_pos_, (void *) &thread_id[i]);
-          }
-        }
-      }*/
-
+      
       for (int i = 0; i < num_threads; i++)
       {
         thread_id[i] = i;
         pthread_create(&p_threads[i], &attr, get_grid_pos_, (void *) &thread_id[i]);
       }
-
     }
-    clock_gettime(CLOCK_REALTIME, &stop1);
-    total_time = (stop1.tv_sec-start.tv_sec)	+0.000000001*(stop1.tv_nsec-start.tv_nsec);
-    printf("Total time taken for the thread part to execute : time (sec) = %8.4f\n ", total_time);
+
 
     // Multithreaded code to find drone in the grid
     // ...
@@ -181,26 +175,36 @@ int main(int argc, char *argv[]) {
 
 }
 
-
+/* Function when number of grids lesser than or equal to the number of threads  */
 void *get_grid_pos(void *s)
 {
     int index = *((int *)s);
     unsigned int row=(int)(index/(get_gridsize()-1));
     unsigned int column = index%(get_gridsize()-1);
-    //std::cout<<"Grid position = "<<row<<" "<<column<<std::endl;
     if(check_grid(row,column) == 0)
     {
       printf("Success in Grid position = %d & %d ",row,column);
+      
+    clock_gettime(CLOCK_REALTIME, &stop1);
+    total_time = (stop1.tv_sec-start.tv_sec)	+0.000000001*(stop1.tv_nsec-start.tv_nsec);
+    printf("Drone = (%u,%u), success = %d, time (sec) = %8.4f\n", // Do not remove
+    drone_x, drone_y, check_drone_location(drone_x,drone_y), total_time);// Do not remove
+    
+    pthread_detach(pthread_self());
+    exit(0);
     }
     pthread_detach(pthread_self());
 
 }
 
+
+/* Function when number of grids are greater than the number of threads  */
 void *get_grid_pos_(void *s)
 {
   int index = *((int *)s);
   unsigned int row = (int)(index/(get_gridsize()-1));
   unsigned int column = index%(get_gridsize()-1);
+  unsigned int temprow,tempcol;
 
   while(check_grid(row,column) != 0)
   {
@@ -214,8 +218,14 @@ void *get_grid_pos_(void *s)
     column = index%(get_gridsize()-1);
   }
 
-  //std::cout<<"Success in Grid position when the number of cells > maximum allowable threads = "<<row<<" "<<column<<"; thread id = "<<index<<std::endl;
-  printf("Success in Grid position > maximum allowable threads = %d & %d ",row,column);
-  pthread_detach(pthread_self());
+    temprow=row;tempcol=column;
+    clock_gettime(CLOCK_REALTIME, &stop1);
+    total_time = (stop1.tv_sec-start.tv_sec)	+0.000000001*(stop1.tv_nsec-start.tv_nsec);
+    printf("Drone = (%u,%u), success = %d, time (sec) = %8.4f\n", // Do not remove
+    temprow, tempcol, check_drone_location(drone_x,drone_y), total_time);// Do not remove
+    
+    pthread_detach(pthread_self());
+    exit(0);
 
 }
+
